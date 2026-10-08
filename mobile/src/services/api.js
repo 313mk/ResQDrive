@@ -27,7 +27,7 @@ export const api = {
     }
   },
 
-  // 2. Authentication
+  // 2. Authentication & Roles
   login: async (email, password = 'password123', role = 'driver') => {
     try {
       const res = await fetch(`${API_CONFIG.BASE_URL}/api/auth/login`, {
@@ -40,12 +40,60 @@ export const api = {
       console.warn('[API] Login fallback:', err.message);
       return {
         success: true,
-        user: { name: email.split('@')[0], email, role, phone: '03001234567' },
+        user: {
+          id: role === 'driver' ? 'usr-demo-driver' : 'usr-demo-mechanic',
+          name: email.includes('@') ? email.split('@')[0] : (role === 'driver' ? 'Muhammad Kamran' : 'Bashir Auto Workshop'),
+          email,
+          role,
+          phone: '03001234567',
+        },
       };
     }
   },
 
-  // 3. Emergency Contacts (Max 5, PostgreSQL synced)
+  register: async (name, email, password, role = 'driver', phone = '03001234567') => {
+    try {
+      const res = await fetch(`${API_CONFIG.BASE_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password, role, phone }),
+      });
+      return await res.json();
+    } catch (err) {
+      console.warn('[API] Register fallback:', err.message);
+      return {
+        success: true,
+        user: { name, email, role, phone },
+      };
+    }
+  },
+
+  // 3. Vehicles (PostgreSQL synced)
+  getVehicles: async (userId) => {
+    try {
+      const url = userId ? `${API_CONFIG.BASE_URL}/api/vehicles?userId=${userId}` : `${API_CONFIG.BASE_URL}/api/vehicles`;
+      const res = await fetch(url);
+      const data = await res.json();
+      return data.vehicles || [];
+    } catch (err) {
+      console.warn('[API] Fetch vehicles fallback:', err.message);
+      return [
+        {
+          id: 'veh-default-1',
+          make: 'Honda',
+          model: 'Civic',
+          year: 2022,
+          variant: '1.8 i-VTEC Oriel',
+          license_plate: 'ICT-LE-2022',
+          color: 'Taffeta White',
+          insurance_company: 'Adamjee Insurance',
+          policy_number: 'PK-ADM-883921-2026',
+        },
+      ];
+    }
+  },
+
+  // 4. Emergency Contacts (Max 5, PostgreSQL synced)
   getContacts: async (userId) => {
     try {
       const url = userId ? `${API_CONFIG.BASE_URL}/api/contacts?userId=${userId}` : `${API_CONFIG.BASE_URL}/api/contacts`;
@@ -55,9 +103,9 @@ export const api = {
     } catch (err) {
       console.warn('[API] Fetch contacts fallback:', err.message);
       return [
-        { id: '1', name: 'Ahmad Khan (Brother)', phone: '03001234567', priority: 1 },
-        { id: '2', name: 'Fatima Kamran (Spouse)', phone: '03219876543', priority: 2 },
-        { id: '3', name: 'Tariq Mehmood (Father)', phone: '03335551234', priority: 3 },
+        { id: '1', name: 'Ahmad Khan (Brother)', phone: '03001234567', priority: 1, is_primary: true },
+        { id: '2', name: 'Fatima Kamran (Spouse)', phone: '03219876543', priority: 2, is_primary: false },
+        { id: '3', name: 'Tariq Mehmood (Father)', phone: '03335551234', priority: 3, is_primary: false },
       ];
     }
   },
@@ -72,7 +120,7 @@ export const api = {
       return await res.json();
     } catch (err) {
       console.error('[API] Add contact error:', err);
-      return { success: false };
+      return { success: false, error: err.message };
     }
   },
 
@@ -88,7 +136,7 @@ export const api = {
     }
   },
 
-  // 4. Incident Collision Logging & Broadcast
+  // 5. Incident Collision Logging & Broadcast
   logIncident: async (incidentPayload) => {
     try {
       const res = await fetch(`${API_CONFIG.BASE_URL}/api/incidents`, {
@@ -99,7 +147,15 @@ export const api = {
       return await res.json();
     } catch (err) {
       console.warn('[API] Log incident offline record:', err.message);
-      return { success: true, incident: { id: `inc-offline-${Date.now()}` } };
+      return {
+        success: true,
+        incident: {
+          id: `inc-offline-${Date.now()}`,
+          severity: incidentPayload.severity || 'Severe',
+          address: incidentPayload.address || 'Islamabad Expressway',
+          timestamp: new Date().toISOString(),
+        },
+      };
     }
   },
 
@@ -116,7 +172,7 @@ export const api = {
     }
   },
 
-  // 5. AI Damage Assessment Microservice
+  // 6. AI Damage Assessment Microservice
   estimateDamageAI: async (formData) => {
     try {
       const res = await fetch(`${API_CONFIG.AI_URL}/predict-damage`, {
