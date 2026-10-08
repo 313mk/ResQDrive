@@ -1,0 +1,32 @@
+# Dependencies (Root, Backend, Mobile)
+node_modules/
+package-lock.json
+
+# Environment variables & passwords (CRITICAL: keeps passwords private)
+.env
+.env*.local
+!.env.example
+
+# Python virtual environments & caches (damage-assessment-ai)
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.pth
+
+# Mobile & Expo caches (mobile)
+.expo/
+*.apk
+*.aab
+
+# Build outputs & system files
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+
+# AI Studio / Editor cache
+.aistudio/
+.vscode/

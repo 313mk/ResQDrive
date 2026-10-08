@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "ResQDrive",
+    "slug": "resqdrive-fyp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "pk.edu.au.resqdrive",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "ResQDrive needs microphone access to detect acoustic crash sounds and process voice commands.",
+        "NSCameraUsageDescription": "ResQDrive needs camera access to capture photographs of vehicle collision damage.",
+        "NSLocationWhenInUseUsageDescription": "ResQDrive requires your location to navigate to the nearest hospitals and dispatch responders.",
+        "NSBluetoothAlwaysUsageDescription": "ResQDrive connects to your in-vehicle ESP32 IoT sensor node via Bluetooth Low Energy."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0B0F17"
+      },
+      "package": "pk.edu.au.resqdrive",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "BLUETOOTH",
+        "BLUETOOTH_ADMIN",
+        "BLUETOOTH_SCAN",
+        "BLUETOOTH_CONNECT",
+        "CALL_PHONE"
+      ]
+    },
+    "extra": {
+      "eas": {
+        "projectId": "25753621-4d43-4082-849d-9007864c6ca9"
+      }
+    }
+  }
+}

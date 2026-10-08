@@ -1,0 +1,6 @@
+{
+  "name": "ResQDrive - Intelligent Auto-Collision Detection & Response",
+  "description": "Intelligent auto-collision detection, IoT/mobile sensor fusion, 10s voice-cancellable emergency countdown, Pakistani rescue dispatch (Rescue 1122, Edhi, Chhipa), and AI vehicle damage assessment.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
