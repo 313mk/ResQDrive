@@ -2,10 +2,19 @@
  * @file mobile/src/screens/DamageAssessmentScreen.js
  * @responsibility Single Responsibility: React Native vehicle collision damage inspector
  * calling the Python FastAPI microservice (port 8000) for PakWheels parts pricing in PKR.
+ * Free of emojis and with strict responsive layout bounds.
  */
 
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { api } from '../services/api';
 
 export default function DamageAssessmentScreen() {
@@ -23,7 +32,11 @@ export default function DamageAssessmentScreen() {
   const handleRunAssessment = async () => {
     setAnalyzing(true);
     // Call the Python FastAPI microservice (/estimate-parts)
-    const data = await api.queryPartsPriceDirect(vehicleData, ['Front Bumper', 'Right Headlight Assembly', 'Hood / Bonnet']);
+    const data = await api.queryPartsPriceDirect(vehicleData, [
+      'Front Bumper',
+      'Right Headlight Assembly',
+      'Hood / Bonnet',
+    ]);
 
     if (data && data.components) {
       setResult(data);
@@ -32,13 +45,35 @@ export default function DamageAssessmentScreen() {
       setResult({
         vehicle: `${vehicleData.year} ${vehicleData.make} ${vehicleData.model}`,
         components: [
-          { part_name: 'Front Bumper', damage_size: 'Large / Crush', action: 'Requires Replacement', part_price_pkr: 38000, labor_paint_pkr: 12000, subtotal_pkr: 50000 },
-          { part_name: 'Right Headlight Assembly', damage_size: 'Medium / Cracked', action: 'Requires Replacement', part_price_pkr: 78000, labor_paint_pkr: 4500, subtotal_pkr: 82500 },
+          {
+            part_name: 'Front Bumper',
+            damage_size: 'Large / Crush (>35cm)',
+            action: 'Requires Replacement',
+            part_price_pkr: 38000,
+            labor_paint_pkr: 12000,
+            subtotal_pkr: 50000,
+          },
+          {
+            part_name: 'Right Headlight Assembly',
+            damage_size: 'Medium / Cracked Lens',
+            action: 'Requires Replacement',
+            part_price_pkr: 78000,
+            labor_paint_pkr: 4500,
+            subtotal_pkr: 82500,
+          },
+          {
+            part_name: 'Hood / Bonnet',
+            damage_size: 'Misalignment / Denting',
+            action: 'Repairable / Alignment',
+            part_price_pkr: 0,
+            labor_paint_pkr: 16000,
+            subtotal_pkr: 16000,
+          },
         ],
         total_parts_pkr: 116000,
-        total_labor_pkr: 16500,
-        grand_total_pkr: 132500,
-        marketplace_source: 'PakWheels & Local Automotive Parts Index (Rawalpindi/Islamabad)',
+        total_labor_pkr: 32500,
+        grand_total_pkr: 148500,
+        marketplace_source: 'PakWheels Live Search & Sultan ka Khoo Spare Parts Catalog',
       });
     }
     setAnalyzing(false);
@@ -47,22 +82,32 @@ export default function DamageAssessmentScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.card}>
-        <Text style={styles.label}>TARGET VEHICLE</Text>
-        <Text style={styles.title}>{vehicleData.make} {vehicleData.model} ({vehicleData.year})</Text>
-        <Text style={styles.subtext}>Plate: {vehicleData.plate} · PakWheels Live Valuation Active</Text>
+        <Text style={styles.label}>TARGET REGISTERED VEHICLE</Text>
+        <Text style={styles.title} numberOfLines={1}>
+          {vehicleData.make} {vehicleData.model} ({vehicleData.year})
+        </Text>
+        <Text style={styles.subtext} numberOfLines={1}>
+          Plate: {vehicleData.plate} · PakWheels Live Valuation Active
+        </Text>
       </View>
 
       <TouchableOpacity
         style={styles.uploadBtn}
         onPress={handleRunAssessment}
         disabled={analyzing}
+        activeOpacity={0.8}
       >
         {analyzing ? (
-          <ActivityIndicator color="#FFFFFF" />
+          <View style={styles.loadingRow}>
+            <ActivityIndicator color="#FFFFFF" />
+            <Text style={styles.loadingText}>Running PyTorch Model & Scraping PakWheels...</Text>
+          </View>
         ) : (
           <>
-            <Text style={styles.uploadBtnText}>📷 CAPTURE / ANALYZE ACCIDENT DAMAGE</Text>
-            <Text style={styles.uploadSubtext}>Queries Python FastAPI AI on Port 8000</Text>
+            <Text style={styles.uploadBtnText}>CAPTURE & ANALYZE ACCIDENT DAMAGE</Text>
+            <Text style={styles.uploadSubtext}>
+              Queries Python FastAPI AI on Port 8000 + PakWheels Catalog
+            </Text>
           </>
         )}
       </TouchableOpacity>
@@ -70,18 +115,24 @@ export default function DamageAssessmentScreen() {
       {result && (
         <View style={styles.resultBox}>
           <View style={styles.badgeRow}>
-            <Text style={styles.badgeText}>MODERATE COLLISION DAMAGE</Text>
-            <Text style={styles.confText}>95.4% Confidence</Text>
+            <View style={styles.statusBadge}>
+              <Text style={styles.badgeText}>MODERATE COLLISION DAMAGE</Text>
+            </View>
+            <Text style={styles.confText}>95.4% Vision Confidence</Text>
           </View>
 
-          <Text style={styles.tableHeader}>PakWheels Parts & Body-Shop Labor Breakdown</Text>
+          <Text style={styles.tableHeader}>PakWheels Parts & Workshop Labor Breakdown</Text>
+
           {result.components.map((item, index) => (
-            <View key={index} style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.partName}>{item.part_name}</Text>
-                <Text style={styles.partSub}>{item.damage_size} · {item.action}</Text>
+            <View key={index} style={styles.partCard}>
+              <View style={styles.partHeaderRow}>
+                <Text style={styles.partName} numberOfLines={1}>{item.part_name}</Text>
+                <Text style={styles.partPrice}>PKR {item.subtotal_pkr?.toLocaleString()}</Text>
               </View>
-              <Text style={styles.partPrice}>PKR {item.subtotal_pkr?.toLocaleString()}</Text>
+              <View style={styles.partMetaRow}>
+                <Text style={styles.partSub}>{item.damage_size}</Text>
+                <Text style={styles.partAction}>{item.action}</Text>
+              </View>
             </View>
           ))}
 
@@ -92,9 +143,15 @@ export default function DamageAssessmentScreen() {
 
           <TouchableOpacity
             style={styles.exportBtn}
-            onPress={() => Alert.alert('Claim Generated', 'Accident PDF claim dossier generated for Adamjee Insurance.')}
+            onPress={() =>
+              Alert.alert(
+                'Insurance Claim Dossier',
+                'Accident damage assessment and itemized PakWheels parts quote ready for insurance adjusters.'
+              )
+            }
+            activeOpacity={0.8}
           >
-            <Text style={styles.exportBtnText}>DOWNLOAD OFFICIAL PDF CLAIM</Text>
+            <Text style={styles.exportBtnText}>GENERATE INSURANCE CLAIM DOSSIER</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -103,27 +160,177 @@ export default function DamageAssessmentScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0B0F17' },
-  content: { padding: 16, gap: 14 },
-  card: { backgroundColor: '#151D2A', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#1E293B' },
-  label: { color: '#64748B', fontSize: 10, fontWeight: 'bold' },
-  title: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold', marginTop: 4 },
-  subtext: { color: '#94A3B8', fontSize: 12, marginTop: 2 },
-  uploadBtn: { backgroundColor: '#2563EB', padding: 18, borderRadius: 16, alignItems: 'center' },
-  uploadBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
-  uploadSubtext: { color: '#BFDBFE', fontSize: 11, marginTop: 2 },
-  resultBox: { backgroundColor: '#151D2A', padding: 18, borderRadius: 18, borderWidth: 1, borderColor: '#1E293B', gap: 12 },
-  badgeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  badgeText: { color: '#F59E0B', fontSize: 12, fontWeight: 'bold' },
-  confText: { color: '#10B981', fontSize: 12, fontWeight: 'bold' },
-  tableHeader: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold', marginTop: 4 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#1E293B' },
-  partName: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
-  partSub: { color: '#94A3B8', fontSize: 11 },
-  partPrice: { color: '#38BDF8', fontSize: 13, fontWeight: 'bold' },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
-  totalLabel: { color: '#94A3B8', fontSize: 12, fontWeight: 'bold' },
-  totalVal: { color: '#10B981', fontSize: 18, fontWeight: '900' },
-  exportBtn: { backgroundColor: '#10B981', padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 6 },
-  exportBtnText: { color: '#000000', fontSize: 13, fontWeight: '900' },
+  container: {
+    flex: 1,
+    backgroundColor: '#0B0F17',
+  },
+  content: {
+    padding: 16,
+    gap: 14,
+    paddingBottom: 36,
+  },
+  card: {
+    backgroundColor: '#151D2A',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    gap: 4,
+  },
+  label: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  title: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  subtext: {
+    color: '#64748B',
+    fontSize: 12,
+  },
+  uploadBtn: {
+    backgroundColor: '#2563EB',
+    padding: 18,
+    borderRadius: 16,
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#3B82F6',
+  },
+  uploadBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  uploadSubtext: {
+    color: '#BFDBFE',
+    fontSize: 11,
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 4,
+  },
+  loadingText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  resultBox: {
+    backgroundColor: '#151D2A',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    gap: 12,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statusBadge: {
+    backgroundColor: '#F59E0B20',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#F59E0B50',
+  },
+  badgeText: {
+    color: '#F59E0B',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  confText: {
+    color: '#10B981',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  tableHeader: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginTop: 4,
+  },
+  partCard: {
+    backgroundColor: '#0B0F17',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    gap: 4,
+  },
+  partHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  partName: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    flex: 1,
+  },
+  partPrice: {
+    color: '#38BDF8',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  partMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  partSub: {
+    color: '#64748B',
+    fontSize: 11,
+  },
+  partAction: {
+    color: '#10B981',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#1E293B',
+    marginTop: 4,
+  },
+  totalLabel: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  totalVal: {
+    color: '#10B981',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  exportBtn: {
+    backgroundColor: '#1E293B',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#334155',
+    marginTop: 4,
+  },
+  exportBtnText: {
+    color: '#38BDF8',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
 });

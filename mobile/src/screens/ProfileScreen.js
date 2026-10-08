@@ -2,7 +2,7 @@
  * @file mobile/src/screens/ProfileScreen.js
  * @responsibility Single Responsibility: React Native Profile & Vehicle details screen
  * displaying authenticated driver/mechanic details, registered vehicle from PostgreSQL,
- * and session logout controls.
+ * and session logout controls. Strictly zero emojis and professional metadata.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -42,12 +42,12 @@ export default function ProfileScreen({ user, onLogout }) {
               {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
             </Text>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.userName}>{user?.name || 'Muhammad Kamran'}</Text>
-            <Text style={styles.userEmail}>{user?.email || 'kamran@students.au.edu.pk'}</Text>
+          <View style={styles.userTextCol}>
+            <Text style={styles.userName} numberOfLines={1}>{user?.name || 'Muhammad Kamran'}</Text>
+            <Text style={styles.userEmail} numberOfLines={1}>{user?.email || 'kamran@resqdrive.pk'}</Text>
             <View style={styles.roleTag}>
               <Text style={styles.roleTagText}>
-                ROLE: {user?.role?.toUpperCase() || 'DRIVER'}
+                ROLE: {user?.role ? user.role.toUpperCase() : 'DRIVER'}
               </Text>
             </View>
           </View>
@@ -58,8 +58,8 @@ export default function ProfileScreen({ user, onLogout }) {
           <Text style={styles.infoValue}>{user?.phone || '03001234567'}</Text>
         </View>
         <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Affiliation:</Text>
-          <Text style={styles.infoValue}>Air University Islamabad (AU FYP)</Text>
+          <Text style={styles.infoLabel}>Dispatched Fleet:</Text>
+          <Text style={styles.infoValue}>ResQDrive Regional Network (Islamabad / Rawalpindi)</Text>
         </View>
       </View>
 
@@ -70,11 +70,11 @@ export default function ProfileScreen({ user, onLogout }) {
           {loading ? (
             <ActivityIndicator color="#38BDF8" style={{ marginVertical: 20 }} />
           ) : vehicle ? (
-            <View style={{ gap: 8 }}>
-              <Text style={styles.vehicleTitle}>
+            <View style={styles.vehicleDetailsCol}>
+              <Text style={styles.vehicleTitle} numberOfLines={1}>
                 {vehicle.make} {vehicle.model} ({vehicle.year})
               </Text>
-              <Text style={styles.vehicleVariant}>
+              <Text style={styles.vehicleVariant} numberOfLines={1}>
                 Variant: {vehicle.variant || '1.8 i-VTEC Oriel'} · {vehicle.color || 'Taffeta White'}
               </Text>
 
@@ -101,138 +101,174 @@ export default function ProfileScreen({ user, onLogout }) {
         </View>
       )}
 
-      {/* Workshop Card (For Mechanic) */}
-      {user?.role === 'mechanic' && (
-        <View style={styles.vehicleCard}>
-          <Text style={styles.sectionTitle}>REGISTERED 3S WORKSHOP & RECOVERY SERVICE</Text>
-          <Text style={styles.vehicleTitle}>Islamabad 3S Auto Body Center</Text>
-          <Text style={styles.vehicleVariant}>I-9/2 Industrial Area, Islamabad</Text>
-          <View style={styles.vehicleMetaGrid}>
-            <View style={styles.metaItem}>
-              <Text style={styles.metaLabel}>TOW TRUCK UNITS</Text>
-              <Text style={styles.metaValue}>3 Ready on Standby</Text>
-            </View>
-            <View style={styles.metaItem}>
-              <Text style={styles.metaLabel}>COVERAGE RADIUS</Text>
-              <Text style={styles.metaValue}>Islamabad / Rawalpindi (35 km)</Text>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* System Status Card */}
-      <View style={styles.statusCard}>
-        <Text style={styles.statusTitle}>SYSTEM & TELEMETRY CONNECTIONS</Text>
-        <Text style={styles.statusItem}>● Node.js & PostgreSQL Backend: Connected (:5000)</Text>
-        <Text style={styles.statusItem}>● WebSocket Broadcast Radar: Active (:5000/ws/live-track)</Text>
-        <Text style={styles.statusItem}>● Python Damage AI Microservice: Active (:8000)</Text>
-        <Text style={styles.statusItem}>● Regional Auto-Dial Target: Rescue 1122 (0519255555)</Text>
-      </View>
-
-      {/* Logout Button */}
+      {/* Logout Action */}
       <TouchableOpacity
         style={styles.logoutBtn}
         onPress={() => {
-          Alert.alert(
-            'Confirm Logout',
-            'Are you sure you want to end your current session?',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Log Out', style: 'destructive', onPress: onLogout },
-            ]
-          );
+          Alert.alert('Sign Out', 'Are you sure you want to log out of your ResQDrive account?', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Sign Out', style: 'destructive', onPress: onLogout },
+          ]);
         }}
+        activeOpacity={0.8}
       >
-        <Text style={styles.logoutBtnText}>Log Out of ResQDrive</Text>
+        <Text style={styles.logoutText}>Sign Out of ResQDrive Session</Text>
       </TouchableOpacity>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0B0F17' },
-  content: { padding: 18, gap: 16, paddingBottom: 40 },
-  card: {
-    backgroundColor: '#151D2A',
-    padding: 18,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#1E293B',
-    gap: 12,
-  },
-  avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  avatar: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold' },
-  userName: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
-  userEmail: { color: '#94A3B8', fontSize: 13, marginTop: 2 },
-  roleTag: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#1E293B',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    marginTop: 6,
-    borderWidth: 1,
-    borderColor: '#3B82F6',
-  },
-  roleTagText: { color: '#38BDF8', fontSize: 10, fontWeight: 'bold' },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#1E293B',
-  },
-  infoLabel: { color: '#94A3B8', fontSize: 12 },
-  infoValue: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
-  vehicleCard: {
-    backgroundColor: '#151D2A',
-    padding: 18,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#1E293B',
-    gap: 8,
-  },
-  sectionTitle: { color: '#38BDF8', fontSize: 11, fontWeight: 'bold', letterSpacing: 0.5 },
-  vehicleTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: 'bold' },
-  vehicleVariant: { color: '#94A3B8', fontSize: 13 },
-  vehicleMetaGrid: { flexDirection: 'row', gap: 10, marginTop: 6 },
-  metaItem: {
+  container: {
     flex: 1,
     backgroundColor: '#0B0F17',
-    padding: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#1E293B',
   },
-  metaLabel: { color: '#64748B', fontSize: 10, fontWeight: 'bold' },
-  metaValue: { color: '#FFFFFF', fontSize: 13, fontWeight: '600', marginTop: 2 },
-  noVehicleText: { color: '#64748B', fontSize: 12, fontStyle: 'italic', marginVertical: 10 },
-  statusCard: {
-    backgroundColor: '#0F172A',
+  content: {
+    padding: 16,
+    gap: 14,
+    paddingBottom: 36,
+  },
+  card: {
+    backgroundColor: '#151D2A',
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#1E293B',
-    gap: 6,
+    gap: 12,
   },
-  statusTitle: { color: '#10B981', fontSize: 11, fontWeight: 'bold' },
-  statusItem: { color: '#94A3B8', fontSize: 12 },
-  logoutBtn: {
-    backgroundColor: '#EF44441A',
-    borderWidth: 1,
-    borderColor: '#EF4444',
-    padding: 14,
-    borderRadius: 12,
+  avatarRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 14,
+  },
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#3B82F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  userTextCol: {
+    flex: 1,
+    gap: 2,
+  },
+  userName: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  userEmail: {
+    color: '#94A3B8',
+    fontSize: 12,
+  },
+  roleTag: {
+    backgroundColor: '#1E293B',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#334155',
+    marginTop: 4,
+  },
+  roleTagText: {
+    color: '#38BDF8',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#1E293B',
+    gap: 8,
+  },
+  infoLabel: {
+    color: '#64748B',
+    fontSize: 12,
+  },
+  infoValue: {
+    color: '#E2E8F0',
+    fontSize: 12,
+    fontWeight: '600',
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+  vehicleCard: {
+    backgroundColor: '#151D2A',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    gap: 10,
+  },
+  sectionTitle: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  vehicleDetailsCol: {
+    gap: 8,
+  },
+  vehicleTitle: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  vehicleVariant: {
+    color: '#64748B',
+    fontSize: 12,
+  },
+  vehicleMetaGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 4,
+  },
+  metaItem: {
+    flex: 1,
+    backgroundColor: '#0B0F17',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    gap: 2,
+  },
+  metaLabel: {
+    color: '#64748B',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  metaValue: {
+    color: '#38BDF8',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  noVehicleText: {
+    color: '#64748B',
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  logoutBtn: {
+    backgroundColor: '#1E293B',
+    padding: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#EF444450',
     marginTop: 6,
   },
-  logoutBtnText: { color: '#EF4444', fontSize: 14, fontWeight: 'bold' },
+  logoutText: {
+    color: '#EF4444',
+    fontSize: 13,
+    fontWeight: '700',
+  },
 });

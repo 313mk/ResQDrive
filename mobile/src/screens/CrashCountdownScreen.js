@@ -3,6 +3,7 @@
  * @responsibility Single Responsibility: React Native full-screen 10-second countdown modal
  * with voice cancel ("I am OK") and 60-second priority auto-call escalation across 5 contacts.
  * Directly persists collision events in PostgreSQL and broadcasts to the Web Admin Center via WebSocket.
+ * Zero emojis and responsive boundaries.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -39,7 +40,7 @@ export default function CrashCountdownScreen({ navigation }) {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
       return () => clearTimeout(timer);
     } else if (countdown === 0 && !isEscalating) {
-      // Countdown expired -> Log Real Collision in PostgreSQL Database!
+      // Countdown expired -> Log Collision in PostgreSQL Database
       (async () => {
         setIsEscalating(true);
 
@@ -59,7 +60,7 @@ export default function CrashCountdownScreen({ navigation }) {
           setCreatedIncidentId(res.incident.id);
         }
 
-        // Auto-Dial Contact 1 immediately!
+        // Auto-Dial Contact 1 immediately
         if (contacts.length > 0) {
           Linking.openURL(`tel:${contacts[0].phone}`);
         }
@@ -79,7 +80,7 @@ export default function CrashCountdownScreen({ navigation }) {
               if (nextIdx < contacts.length) {
                 Linking.openURL(`tel:${contacts[nextIdx].phone}`);
               } else {
-                // Reached end of 5 contacts -> Dial Pakistani 11-digit Regional Rescue Command
+                // Reached end of 5 contacts -> Dial Pakistani Regional Rescue Command
                 Linking.openURL('tel:0519255555');
               }
               return nextIdx;
@@ -128,11 +129,18 @@ export default function CrashCountdownScreen({ navigation }) {
           </View>
 
           <View style={styles.voiceBox}>
-            <Text style={styles.voiceTitle}>🎤 Hands-Free Voice Cancel Active</Text>
-            <Text style={styles.voiceDesc}>Say loudly: "I AM OK" or "CANCEL"</Text>
+            <View style={styles.voiceHeaderRow}>
+              <View style={styles.micDot} />
+              <Text style={styles.voiceTitle}>Hands-Free Voice Cancel Active</Text>
+            </View>
+            <Text style={styles.voiceDesc}>Say loudly: "I AM OK" or tap button below</Text>
           </View>
 
-          <TouchableOpacity style={styles.cancelBtn} onPress={handleCancelFalseAlarm}>
+          <TouchableOpacity
+            style={styles.cancelBtn}
+            onPress={handleCancelFalseAlarm}
+            activeOpacity={0.8}
+          >
             <Text style={styles.cancelBtnText}>I AM OK — CANCEL ALERT</Text>
           </TouchableOpacity>
         </View>
@@ -145,20 +153,25 @@ export default function CrashCountdownScreen({ navigation }) {
           </Text>
 
           <View style={styles.callCard}>
-            <Text style={styles.callTargetName}>{currentTargetName}</Text>
+            <Text style={styles.callTargetName} numberOfLines={2}>{currentTargetName}</Text>
             <Text style={styles.timerNumber}>
               00:{escalationTimer < 10 ? `0${escalationTimer}` : escalationTimer}
             </Text>
             <Text style={styles.timerSub}>NEXT CONTACT IN 60s INTERVAL</Text>
           </View>
 
-          <TouchableOpacity style={styles.ackBtn} onPress={handleAcknowledge}>
+          <TouchableOpacity
+            style={styles.ackBtn}
+            onPress={handleAcknowledge}
+            activeOpacity={0.8}
+          >
             <Text style={styles.ackBtnText}>ACKNOWLEDGE (STOP CALLING)</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.dialerBtn}
             onPress={() => Linking.openURL('tel:1122')}
+            activeOpacity={0.7}
           >
             <Text style={styles.dialerBtnText}>Open Rescue 1122 in Dialer</Text>
           </TouchableOpacity>
@@ -169,31 +182,81 @@ export default function CrashCountdownScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0B0F17', padding: 20, justifyContent: 'center' },
-  inner: { alignItems: 'center', gap: 16 },
-  alertHeader: { color: '#EF4444', fontSize: 13, fontWeight: 'bold', letterSpacing: 1.5 },
-  alertQuestion: { color: '#FFFFFF', fontSize: 24, fontWeight: '900' },
+  container: {
+    flex: 1,
+    backgroundColor: '#0B0F17',
+    padding: 24,
+    justifyContent: 'center',
+  },
+  inner: {
+    alignItems: 'center',
+    gap: 16,
+  },
+  alertHeader: {
+    color: '#EF4444',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    textAlign: 'center',
+  },
+  alertQuestion: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
   circleTimer: {
     width: 140,
     height: 140,
     borderRadius: 70,
-    borderWidth: 6,
+    borderWidth: 5,
     borderColor: '#DC2626',
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 12,
+    marginVertical: 10,
+    backgroundColor: '#1E1418',
   },
-  timerNumber: { color: '#FFFFFF', fontSize: 44, fontWeight: '900' },
-  timerSub: { color: '#94A3B8', fontSize: 10, fontWeight: 'bold' },
+  timerNumber: {
+    color: '#FFFFFF',
+    fontSize: 44,
+    fontWeight: '900',
+  },
+  timerSub: {
+    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
   voiceBox: {
     backgroundColor: '#1E293B',
     padding: 14,
     borderRadius: 14,
     width: '100%',
     alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#334155',
   },
-  voiceTitle: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
-  voiceDesc: { color: '#94A3B8', fontSize: 12, marginTop: 2 },
+  voiceHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  micDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  voiceTitle: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  voiceDesc: {
+    color: '#94A3B8',
+    fontSize: 12,
+  },
   cancelBtn: {
     backgroundColor: '#10B981',
     width: '100%',
@@ -201,8 +264,17 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
   },
-  cancelBtnText: { color: '#000000', fontSize: 15, fontWeight: '900' },
-  escalatingTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
+  cancelBtnText: {
+    color: '#000000',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  escalatingTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
   callCard: {
     backgroundColor: '#151D2A',
     width: '100%',
@@ -211,22 +283,38 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#DC2626',
     alignItems: 'center',
+    gap: 6,
   },
-  callTargetName: { color: '#38BDF8', fontSize: 16, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' },
+  callTargetName: {
+    color: '#38BDF8',
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
   ackBtn: {
     backgroundColor: '#10B981',
     width: '100%',
     padding: 16,
-    borderRadius: 16,
+    borderRadius: 14,
     alignItems: 'center',
   },
-  ackBtnText: { color: '#000000', fontSize: 14, fontWeight: '900' },
+  ackBtnText: {
+    color: '#000000',
+    fontSize: 14,
+    fontWeight: '900',
+  },
   dialerBtn: {
     backgroundColor: '#1E293B',
     width: '100%',
     padding: 14,
     borderRadius: 14,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#334155',
   },
-  dialerBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
+  dialerBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
 });

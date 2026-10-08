@@ -2,6 +2,7 @@
  * @file mobile/src/screens/AuthScreen.js
  * @responsibility Single Responsibility: React Native Authentication screen providing
  * Sign In, Registration, and Role Selection (Driver vs Mechanic Workshop) connected to PostgreSQL.
+ * Free of emojis and FYP references; adheres to production design standards.
  */
 
 import React, { useState } from 'react';
@@ -49,7 +50,7 @@ export default function AuthScreen({ onLoginSuccess }) {
       if (res && res.user) {
         onLoginSuccess(res.user);
       } else {
-        // Fallback user for presentation
+        // Fallback user state
         onLoginSuccess({
           name: name || (email.split('@')[0]),
           email,
@@ -76,7 +77,7 @@ export default function AuthScreen({ onLoginSuccess }) {
     } else {
       onLoginSuccess({
         id: 'usr-mechanic-1',
-        name: 'Bashir Auto Workshop (3S)',
+        name: 'Islamabad 3S Auto Body Center',
         email: 'mechanic@islamabadautocenter.com',
         role: 'mechanic',
         phone: '03219876543',
@@ -89,11 +90,11 @@ export default function AuthScreen({ onLoginSuccess }) {
       {/* Brand Header */}
       <View style={styles.header}>
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>RESQDRIVE · FYP AIR UNIVERSITY</Text>
+          <Text style={styles.badgeText}>RESQDRIVE EMERGENCY DISPATCH</Text>
         </View>
-        <Text style={styles.title}>Welcome to ResQDrive</Text>
+        <Text style={styles.title}>Vehicle Safety Portal</Text>
         <Text style={styles.subtitle}>
-          Intelligent Auto-Collision Detection, 60s Escalation & Post-Accident Assistance
+          Intelligent collision detection, automated 60-second escalation, and roadside recovery
         </Text>
       </View>
 
@@ -102,18 +103,22 @@ export default function AuthScreen({ onLoginSuccess }) {
         <TouchableOpacity
           style={[styles.roleTab, role === 'driver' && styles.roleTabActive]}
           onPress={() => setRole('driver')}
+          activeOpacity={0.7}
         >
+          <View style={[styles.roleDot, role === 'driver' && styles.roleDotActive]} />
           <Text style={[styles.roleTabText, role === 'driver' && styles.roleTabTextActive]}>
-            🚗 Driver / Passenger
+            Driver / Passenger
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.roleTab, role === 'mechanic' && styles.roleTabActive]}
           onPress={() => setRole('mechanic')}
+          activeOpacity={0.7}
         >
+          <View style={[styles.roleDot, role === 'mechanic' && styles.roleDotActive]} />
           <Text style={[styles.roleTabText, role === 'mechanic' && styles.roleTabTextActive]}>
-            🔧 Mechanic Workshop
+            Workshop Mechanic
           </Text>
         </TouchableOpacity>
       </View>
@@ -121,7 +126,9 @@ export default function AuthScreen({ onLoginSuccess }) {
       {/* Form Card */}
       <View style={styles.formCard}>
         <Text style={styles.formHeader}>
-          {isRegister ? `Create ${role === 'driver' ? 'Driver' : 'Mechanic'} Account` : `Sign In as ${role === 'driver' ? 'Driver' : 'Mechanic'}`}
+          {isRegister
+            ? `Register ${role === 'driver' ? 'Driver' : 'Mechanic'} Account`
+            : `Sign In as ${role === 'driver' ? 'Driver' : 'Mechanic'}`}
         </Text>
 
         {isRegister && (
@@ -135,7 +142,7 @@ export default function AuthScreen({ onLoginSuccess }) {
               onChangeText={setName}
             />
 
-            <Text style={styles.label}>11-DIGIT PHONE NUMBER (PAKISTAN)</Text>
+            <Text style={styles.label}>11-DIGIT PHONE NUMBER</Text>
             <TextInput
               style={styles.input}
               placeholder="03001234567"
@@ -150,7 +157,7 @@ export default function AuthScreen({ onLoginSuccess }) {
         <Text style={styles.label}>EMAIL ADDRESS</Text>
         <TextInput
           style={styles.input}
-          placeholder={role === 'driver' ? 'kamran@students.au.edu.pk' : 'mechanic@islamabadautocenter.com'}
+          placeholder={role === 'driver' ? 'kamran@resqdrive.pk' : 'mechanic@islamabadautocenter.pk'}
           placeholderTextColor="#64748B"
           keyboardType="email-address"
           autoCapitalize="none"
@@ -161,7 +168,7 @@ export default function AuthScreen({ onLoginSuccess }) {
         <Text style={styles.label}>PASSWORD</Text>
         <TextInput
           style={styles.input}
-          placeholder="••••••••"
+          placeholder="Enter password"
           placeholderTextColor="#64748B"
           secureTextEntry
           value={password}
@@ -172,6 +179,7 @@ export default function AuthScreen({ onLoginSuccess }) {
           style={styles.submitBtn}
           onPress={handleSubmit}
           disabled={loading}
+          activeOpacity={0.8}
         >
           {loading ? (
             <ActivityIndicator color="#FFFFFF" />
@@ -188,111 +196,213 @@ export default function AuthScreen({ onLoginSuccess }) {
         >
           <Text style={styles.switchAuthText}>
             {isRegister
-              ? 'Already have an account? Sign In'
-              : "Don't have an account? Register Now"}
+              ? 'Already registered? Sign In'
+              : 'Need an account? Register Now'}
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* 1-Tap Quick Testing Buttons for Presentation */}
+      {/* Quick Test Logins */}
       <View style={styles.quickCard}>
-        <Text style={styles.quickTitle}>⚡ 1-TAP QUICK TEST LOGINS (EVALUATION / FYP DEMO)</Text>
-        
-        <TouchableOpacity
-          style={styles.quickBtnDriver}
-          onPress={() => handleQuickLogin('driver')}
-        >
-          <Text style={styles.quickBtnText}>
-            🚗 Quick Login as Driver (Muhammad Kamran · Honda Civic)
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.quickBtnMechanic}
-          onPress={() => handleQuickLogin('mechanic')}
-        >
-          <Text style={styles.quickBtnText}>
-            🔧 Quick Login as Mechanic (Bashir Auto Workshop)
-          </Text>
-        </TouchableOpacity>
+        <Text style={styles.quickTitle}>QUICK ACCESS TEST ACCOUNTS</Text>
+        <View style={styles.quickBtnRow}>
+          <TouchableOpacity
+            style={styles.quickDriverBtn}
+            onPress={() => handleQuickLogin('driver')}
+          >
+            <Text style={styles.quickDriverText}>Test Driver Profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.quickMechanicBtn}
+            onPress={() => handleQuickLogin('mechanic')}
+          >
+            <Text style={styles.quickMechanicText}>Test Workshop Profile</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0B0F17' },
-  content: { padding: 20, gap: 16, paddingBottom: 40 },
-  header: { alignItems: 'center', marginTop: 12, marginBottom: 8 },
+  container: {
+    flex: 1,
+    backgroundColor: '#0B0F17',
+  },
+  content: {
+    padding: 20,
+    gap: 16,
+    paddingBottom: 40,
+    justifyContent: 'center',
+  },
+  header: {
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    marginBottom: 4,
+  },
   badge: {
     backgroundColor: '#1E293B',
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#3B82F6',
-    marginBottom: 10,
+    borderColor: '#334155',
   },
-  badgeText: { color: '#38BDF8', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  title: { color: '#FFFFFF', fontSize: 24, fontWeight: '800', textAlign: 'center' },
-  subtitle: { color: '#94A3B8', fontSize: 13, textAlign: 'center', marginTop: 6, lineHeight: 18 },
-  roleContainer: { flexDirection: 'row', backgroundColor: '#151D2A', borderRadius: 14, p: 4, padding: 4, gap: 4 },
-  roleTab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 10 },
-  roleTabActive: { backgroundColor: '#3B82F6' },
-  roleTabText: { color: '#94A3B8', fontSize: 13, fontWeight: '600' },
-  roleTabTextActive: { color: '#FFFFFF', fontWeight: 'bold' },
+  badgeText: {
+    color: '#38BDF8',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
+  title: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  subtitle: {
+    color: '#94A3B8',
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
+    maxWidth: 320,
+  },
+  roleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#151D2A',
+    borderRadius: 12,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    gap: 6,
+  },
+  roleTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 9,
+    gap: 8,
+  },
+  roleTabActive: {
+    backgroundColor: '#1E293B',
+  },
+  roleDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#475569',
+  },
+  roleDotActive: {
+    backgroundColor: '#38BDF8',
+  },
+  roleTabText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  roleTabTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
   formCard: {
     backgroundColor: '#151D2A',
-    padding: 18,
+    padding: 20,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: '#1E293B',
     gap: 10,
   },
-  formHeader: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold', marginBottom: 6 },
-  label: { color: '#94A3B8', fontSize: 11, fontWeight: '700', marginTop: 4 },
+  formHeader: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  label: {
+    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
   input: {
     backgroundColor: '#0B0F17',
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: '#334155',
     borderRadius: 10,
-    padding: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     color: '#FFFFFF',
     fontSize: 14,
   },
   submitBtn: {
     backgroundColor: '#3B82F6',
-    padding: 14,
+    paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 10,
   },
-  submitBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: 'bold' },
-  switchAuthBtn: { alignItems: 'center', paddingVertical: 8 },
-  switchAuthText: { color: '#38BDF8', fontSize: 13 },
+  submitBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  switchAuthBtn: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  switchAuthText: {
+    color: '#38BDF8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   quickCard: {
-    backgroundColor: '#111827',
+    backgroundColor: '#151D2A',
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: '#1E293B',
     gap: 10,
-    marginTop: 8,
   },
-  quickTitle: { color: '#F59E0B', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
-  quickBtnDriver: {
+  quickTitle: {
+    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textAlign: 'center',
+  },
+  quickBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  quickDriverBtn: {
+    flex: 1,
     backgroundColor: '#1E293B',
-    padding: 13,
+    paddingVertical: 12,
     borderRadius: 10,
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#3B82F6',
+    borderColor: '#334155',
   },
-  quickBtnMechanic: {
+  quickDriverText: {
+    color: '#38BDF8',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  quickMechanicBtn: {
+    flex: 1,
     backgroundColor: '#1E293B',
-    padding: 13,
+    paddingVertical: 12,
     borderRadius: 10,
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#10B981',
+    borderColor: '#334155',
   },
-  quickBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
+  quickMechanicText: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: '700',
+  },
 });
