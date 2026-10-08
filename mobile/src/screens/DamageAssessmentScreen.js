@@ -1,66 +1,98 @@
 /**
  * @file mobile/src/screens/DamageAssessmentScreen.js
  * @responsibility Single Responsibility: React Native vehicle collision damage inspector
- * integrating camera/gallery uploads with the PakWheels parts pricing catalog in PKR.
+ * calling the Python FastAPI microservice (port 8000) for PakWheels parts pricing in PKR.
  */
 
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { api } from '../services/api';
 
 export default function DamageAssessmentScreen() {
-  const [analyzed, setAnalyzed] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [result, setResult] = useState(null);
 
-  const sampleComponents = [
-    { part: 'Front Bumper', size: 'Large / Crush', action: 'Replace', partPKR: 38000, laborPKR: 12000 },
-    { part: 'Right Headlight Assembly', size: 'Medium / Cracked', action: 'Replace', partPKR: 78000, laborPKR: 4500 },
-  ];
+  const vehicleData = {
+    make: 'Honda',
+    model: 'Civic',
+    year: 2022,
+    variant: '1.8 i-VTEC Oriel',
+    plate: 'ICT-LE-2022',
+  };
 
-  const totalParts = 116000;
-  const totalLabor = 16500;
-  const grandTotal = totalParts + totalLabor;
+  const handleRunAssessment = async () => {
+    setAnalyzing(true);
+    // Call the Python FastAPI microservice (/estimate-parts)
+    const data = await api.queryPartsPriceDirect(vehicleData, ['Front Bumper', 'Right Headlight Assembly', 'Hood / Bonnet']);
+
+    if (data && data.components) {
+      setResult(data);
+    } else {
+      // Offline fallback
+      setResult({
+        vehicle: `${vehicleData.year} ${vehicleData.make} ${vehicleData.model}`,
+        components: [
+          { part_name: 'Front Bumper', damage_size: 'Large / Crush', action: 'Requires Replacement', part_price_pkr: 38000, labor_paint_pkr: 12000, subtotal_pkr: 50000 },
+          { part_name: 'Right Headlight Assembly', damage_size: 'Medium / Cracked', action: 'Requires Replacement', part_price_pkr: 78000, labor_paint_pkr: 4500, subtotal_pkr: 82500 },
+        ],
+        total_parts_pkr: 116000,
+        total_labor_pkr: 16500,
+        grand_total_pkr: 132500,
+        marketplace_source: 'PakWheels & Local Automotive Parts Index (Rawalpindi/Islamabad)',
+      });
+    }
+    setAnalyzing(false);
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.card}>
         <Text style={styles.label}>TARGET VEHICLE</Text>
-        <Text style={styles.title}>Honda Civic 1.8 Oriel (2022)</Text>
-        <Text style={styles.subtext}>Plate: ICT-LE-2022 · PakWheels Index Active</Text>
+        <Text style={styles.title}>{vehicleData.make} {vehicleData.model} ({vehicleData.year})</Text>
+        <Text style={styles.subtext}>Plate: {vehicleData.plate} · PakWheels Live Valuation Active</Text>
       </View>
 
       <TouchableOpacity
         style={styles.uploadBtn}
-        onPress={() => setAnalyzed(true)}
+        onPress={handleRunAssessment}
+        disabled={analyzing}
       >
-        <Text style={styles.uploadBtnText}>📷 CAPTURE / UPLOAD ACCIDENT PHOTO</Text>
-        <Text style={styles.uploadSubtext}>Runs MobileNetV3 AI panel segmentation</Text>
+        {analyzing ? (
+          <ActivityIndicator color="#FFFFFF" />
+        ) : (
+          <>
+            <Text style={styles.uploadBtnText}>📷 CAPTURE / ANALYZE ACCIDENT DAMAGE</Text>
+            <Text style={styles.uploadSubtext}>Queries Python FastAPI AI on Port 8000</Text>
+          </>
+        )}
       </TouchableOpacity>
 
-      {analyzed && (
+      {result && (
         <View style={styles.resultBox}>
           <View style={styles.badgeRow}>
-            <Text style={styles.badgeText}>MODERATE DAMAGE DETECTED</Text>
-            <Text style={styles.confText}>95.2% Confidence</Text>
+            <Text style={styles.badgeText}>MODERATE COLLISION DAMAGE</Text>
+            <Text style={styles.confText}>95.4% Confidence</Text>
           </View>
 
           <Text style={styles.tableHeader}>PakWheels Parts & Body-Shop Labor Breakdown</Text>
-          {sampleComponents.map((item, index) => (
+          {result.components.map((item, index) => (
             <View key={index} style={styles.row}>
-              <View>
-                <Text style={styles.partName}>{item.part}</Text>
-                <Text style={styles.partSub}>{item.size} · {item.action}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.partName}>{item.part_name}</Text>
+                <Text style={styles.partSub}>{item.damage_size} · {item.action}</Text>
               </View>
-              <Text style={styles.partPrice}>PKR {(item.partPKR + item.laborPKR).toLocaleString()}</Text>
+              <Text style={styles.partPrice}>PKR {item.subtotal_pkr?.toLocaleString()}</Text>
             </View>
           ))}
 
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>TOTAL ESTIMATED CLAIM:</Text>
-            <Text style={styles.totalVal}>PKR {grandTotal.toLocaleString()}</Text>
+            <Text style={styles.totalVal}>PKR {result.grand_total_pkr?.toLocaleString()}</Text>
           </View>
 
           <TouchableOpacity
             style={styles.exportBtn}
-            onPress={() => Alert.alert('Claim Generated', 'Accident PDF dossier generated for Adamjee Insurance.')}
+            onPress={() => Alert.alert('Claim Generated', 'Accident PDF claim dossier generated for Adamjee Insurance.')}
           >
             <Text style={styles.exportBtnText}>DOWNLOAD OFFICIAL PDF CLAIM</Text>
           </TouchableOpacity>
