@@ -1,378 +1,636 @@
 /**
  * @file src/components/admin/AdminDashboard.tsx
- * @responsibility Single Responsibility: Render the national emergency command center and dispatcher console.
- * Connects directly to PostgreSQL (port 5000) and listens to real-time WebSockets to display live collision alerts
- * dispatched from physical smartphones running the Expo Go app.
+ * @responsibility Single Responsibility: Main controller and dashboard view for the
+ * ResQDrive Emergency Operations Command Center. Coordinates live PostgreSQL queries,
+ * WebSocket streaming, and sub-views (Dispatch Queue, GIS Map, Hotspots, Fleets, Vehicles, Damage AI).
  */
 
-import React, { useState, useEffect } from 'react';
-import { useApp } from '../../context/AppContext';
-import { Shield, AlertTriangle, MapPin, Activity, Download, Search, CheckCircle, Flame, Radio, Phone, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  AlertTriangle,
+  Radio,
+  Compass,
+  Flame,
+  Truck,
+  Car,
+  Wrench,
+  Activity,
+  Layers,
+  CheckCircle2,
+  PhoneCall
+} from 'lucide-react';
+import { AdminHeader } from './AdminHeader';
+import { EmergencyDispatchQueue } from './EmergencyDispatchQueue';
+import { InteractiveGISMap } from './InteractiveGISMap';
+import { CollisionHeatmapIndex } from './CollisionHeatmapIndex';
+import { RescueFleetManager } from './RescueFleetManager';
+import { VehiclesRegistryView } from './VehiclesRegistryView';
+import { DamageClaimsView } from './DamageClaimsView';
+import { IncidentDetailDrawer } from './IncidentDetailDrawer';
+import { TestCollisionTriggerModal } from './TestCollisionTriggerModal';
+import { PAKISTAN_RESCUE_SERVICES } from '../../services/pakistanDirectory';
+import { soundEffects } from '../../services/soundEffects';
 
-const HOTSPOT_LOCATIONS = [
-  { name: 'Islamabad Expressway (Faizabad - Zero Point)', city: 'Islamabad', crashes: 42, risk: 'High', avgSpeed: '85 km/h' },
-  { name: 'Murree Road near Chandni Chowk', city: 'Rawalpindi', crashes: 31, risk: 'Moderate', avgSpeed: '45 km/h' },
-  { name: 'Grand Trunk (GT) Road (Lahore - Gujranwala)', city: 'Punjab', crashes: 68, risk: 'Severe', avgSpeed: '95 km/h' },
-  { name: 'M-2 Motorway (Kallar Kahar Salt Range Descent)', city: 'Punjab', crashes: 54, risk: 'Severe', avgSpeed: '110 km/h' },
-  { name: 'Shahrah-e-Faisal near Karsaz', city: 'Karachi', crashes: 38, risk: 'Moderate', avgSpeed: '60 km/h' },
+type AdminTab = 'dispatch' | 'gis_map' | 'heatmap' | 'fleets' | 'vehicles' | 'claims';
+
+// Standard baseline fallback data (if backend is offline during cold start)
+const BASELINE_INCIDENTS = [
+  {
+    id: 'inc-isb-01',
+    timestamp: Date.now() - 1000 * 60 * 14,
+    dateTimeStr: 'Today, 18:22 PKT',
+    status: 'escalating',
+    severity: 'Severe',
+    coordinates: {
+      lat: 33.6628,
+      lng: 73.0843,
+      address: 'Islamabad Expressway near Faizabad Interchange',
+      city: 'Islamabad',
+      province: 'Islamabad Capital Territory',
+    },
+    vehicle: {
+      make: 'Honda',
+      model: 'Civic',
+      licensePlate: 'ICT-LE-2022',
+    },
+    sensorSnapshot: {
+      totalGForce: 4.2,
+      speedDeltaKmH: 62,
+    },
+    detectionSource: 'mobile_sensor',
+  },
+  {
+    id: 'inc-m2-02',
+    timestamp: Date.now() - 1000 * 60 * 45,
+    dateTimeStr: 'Today, 17:51 PKT',
+    status: 'acknowledged',
+    severity: 'Severe',
+    coordinates: {
+      lat: 32.7816,
+      lng: 72.7011,
+      address: 'M-2 Motorway (Kallar Kahar Salt Range Descent Km 234)',
+      city: 'Chakwal',
+      province: 'Punjab',
+    },
+    vehicle: {
+      make: 'Toyota',
+      model: 'Corolla Altis',
+      licensePlate: 'LHE-RN-5120',
+    },
+    sensorSnapshot: {
+      totalGForce: 3.8,
+      speedDeltaKmH: 55,
+    },
+    detectionSource: 'iot_esp32',
+  },
+  {
+    id: 'inc-gt-03',
+    timestamp: Date.now() - 1000 * 60 * 110,
+    dateTimeStr: 'Today, 16:46 PKT',
+    status: 'cancelled_false_alarm',
+    severity: 'Moderate',
+    coordinates: {
+      lat: 32.1877,
+      lng: 74.1945,
+      address: 'Grand Trunk (GT) Road near Gujranwala Bypass',
+      city: 'Gujranwala',
+      province: 'Punjab',
+    },
+    vehicle: {
+      make: 'Suzuki',
+      model: 'Alto 660cc',
+      licensePlate: 'ISB-AF-3991',
+    },
+    sensorSnapshot: {
+      totalGForce: 2.7,
+      speedDeltaKmH: 35,
+    },
+    detectionSource: 'mobile_sensor',
+  },
+];
+
+const BASELINE_VEHICLES = [
+  {
+    id: 'v-1',
+    make: 'Honda',
+    model: 'Civic',
+    year: 2022,
+    variant: '1.8 i-VTEC Oriel',
+    car_type: 'Sedan',
+    color: 'Taffeta White',
+    license_plate: 'ICT-LE-2022',
+    insurance_company: 'Adamjee Insurance Pakistan',
+    policy_number: 'PK-ADM-883921-2026',
+  },
+  {
+    id: 'v-2',
+    make: 'Toyota',
+    model: 'Corolla',
+    year: 2021,
+    variant: '1.6 Altis Automatic',
+    car_type: 'Sedan',
+    color: 'Super White',
+    license_plate: 'LHE-RN-5120',
+    insurance_company: 'EFU General Insurance',
+    policy_number: 'EFU-PK-991204-2026',
+  },
+  {
+    id: 'v-3',
+    make: 'Suzuki',
+    model: 'Alto',
+    year: 2023,
+    variant: '660cc VXR',
+    car_type: 'Hatchback',
+    color: 'Silky Silver',
+    license_plate: 'ISB-AF-3991',
+    insurance_company: 'Jubilee General Insurance',
+    policy_number: 'JUB-PK-331002-2026',
+  },
 ];
 
 export const AdminDashboard: React.FC = () => {
-  const { incidents: localIncidents } = useApp();
-  const [dbIncidents, setDbIncidents] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<AdminTab>('dispatch');
+  const [incidents, setIncidents] = useState<any[]>(BASELINE_INCIDENTS);
+  const [vehicles, setVehicles] = useState<any[]>(BASELINE_VEHICLES);
+  const [rescueServices, setRescueServices] = useState<any[]>(PAKISTAN_RESCUE_SERVICES);
   const [liveEmergency, setLiveEmergency] = useState<any | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
-  const [isLiveConnected, setIsLiveConnected] = useState(false);
+
+  // Connection & status telemetry
+  const [isWsConnected, setIsWsConnected] = useState(false);
+  const [isDbConnected, setIsDbConnected] = useState(false);
+  const [isAiConnected, setIsAiConnected] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isAudioAlertEnabled, setIsAudioAlertEnabled] = useState(true);
+
+  // Modals & drawers
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
+  const [isTestModalOpen, setIsTestModalOpen] = useState(false);
+
+  const wsRef = useRef<WebSocket | null>(null);
 
   // 1. Fetch real incidents from PostgreSQL backend
-  const fetchDbIncidents = async () => {
+  const fetchIncidentsFromBackend = useCallback(async () => {
     setIsRefreshing(true);
     try {
       const res = await fetch('http://localhost:5000/api/incidents');
       if (res.ok) {
         const data = await res.json();
         if (data.incidents && data.incidents.length > 0) {
-          setDbIncidents(data.incidents);
+          const mapped = data.incidents.map((dbInc: any) => ({
+            id: dbInc.id,
+            dateTimeStr: new Date(dbInc.timestamp).toLocaleString('en-PK', { timeZone: 'Asia/Karachi' }),
+            timestamp: new Date(dbInc.timestamp).getTime(),
+            severity: dbInc.severity,
+            status: dbInc.status,
+            coordinates: {
+              lat: parseFloat(dbInc.latitude) || 33.7027,
+              lng: parseFloat(dbInc.longitude) || 73.0569,
+              address: dbInc.address,
+              city: dbInc.city,
+              province: dbInc.province,
+            },
+            vehicle: {
+              make: dbInc.make || 'Honda',
+              model: dbInc.model || 'Civic',
+              licensePlate: dbInc.license_plate || 'ICT-LE-2022',
+            },
+            sensorSnapshot: {
+              totalGForce: parseFloat(dbInc.peak_g_force) || 3.8,
+              speedDeltaKmH: parseFloat(dbInc.speed_drop_kmh) || 55,
+            },
+            detectionSource: dbInc.detection_source || 'mobile_sensor',
+          }));
+          setIncidents(mapped);
+          setIsDbConnected(true);
         }
       }
     } catch {
-      // Backend offline fallback to local context
+      // Backend not reached, keep baseline
+      setIsDbConnected(false);
     }
     setIsRefreshing(false);
-  };
-
-  useEffect(() => {
-    fetchDbIncidents();
-
-    // 2. Connect to WebSocket live stream from backend
-    let ws: WebSocket | null = null;
-    try {
-      ws = new WebSocket('ws://localhost:5000/ws/live-track');
-
-      ws.onopen = () => {
-        setIsLiveConnected(true);
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data);
-          if (payload.type === 'NEW_ACCIDENT_EMERGENCY') {
-            setLiveEmergency(payload.incident);
-            fetchDbIncidents();
-          } else if (payload.type === 'INCIDENT_ACKNOWLEDGED') {
-            setLiveEmergency(null);
-            fetchDbIncidents();
-          }
-        } catch {
-          // Parse safety
-        }
-      };
-
-      ws.onclose = () => {
-        setIsLiveConnected(false);
-      };
-    } catch {
-      setIsLiveConnected(false);
-    }
-
-    return () => {
-      if (ws) ws.close();
-    };
   }, []);
 
-  const handleAcknowledgeFromConsole = async (incidentId: string) => {
+  // 2. Fetch vehicles from PostgreSQL
+  const fetchVehiclesFromBackend = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:5000/api/vehicles');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.vehicles && data.vehicles.length > 0) {
+          setVehicles(data.vehicles);
+        }
+      }
+    } catch {
+      // Keep baseline
+    }
+  }, []);
+
+  // 3. Fetch rescue services
+  const fetchRescueServicesFromBackend = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:5000/api/rescue-services');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.services && data.services.length > 0) {
+          setRescueServices(data.services);
+        }
+      }
+    } catch {
+      // Keep baseline
+    }
+  }, []);
+
+  // 4. Ping AI vision microservice (port 8000)
+  const checkAiHealth = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:8000/health');
+      if (res.ok) {
+        setIsAiConnected(true);
+      }
+    } catch {
+      setIsAiConnected(false);
+    }
+  }, []);
+
+  // Setup WebSocket stream and polling
+  useEffect(() => {
+    fetchIncidentsFromBackend();
+    fetchVehiclesFromBackend();
+    fetchRescueServicesFromBackend();
+    checkAiHealth();
+
+    // Connect WebSocket
+    const connectWs = () => {
+      try {
+        const ws = new WebSocket('ws://localhost:5000/ws/live-track');
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+          setIsWsConnected(true);
+          ws.send(JSON.stringify({ type: 'SUBSCRIBE', clientType: 'admin_dashboard' }));
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'NEW_ACCIDENT_EMERGENCY') {
+              setLiveEmergency(data.incident);
+              if (isAudioAlertEnabled) {
+                soundEffects.startEmergencySiren();
+                setTimeout(() => soundEffects.stopEmergencySiren(), 6000);
+              }
+              fetchIncidentsFromBackend();
+            } else if (data.type === 'INCIDENT_ACKNOWLEDGED') {
+              setLiveEmergency(null);
+              soundEffects.stopEmergencySiren();
+              soundEffects.playSafeDisarmChime();
+              fetchIncidentsFromBackend();
+            }
+          } catch {
+            // Safety
+          }
+        };
+
+        ws.onclose = () => {
+          setIsWsConnected(false);
+          // Try reconnect after 5s
+          setTimeout(connectWs, 5000);
+        };
+
+        ws.onerror = () => {
+          setIsWsConnected(false);
+        };
+      } catch {
+        setIsWsConnected(false);
+      }
+    };
+
+    connectWs();
+
+    // Auto-poll DB every 15s to keep incidents fresh
+    const pollInterval = setInterval(() => {
+      fetchIncidentsFromBackend();
+    }, 15000);
+
+    return () => {
+      clearInterval(pollInterval);
+      if (wsRef.current) wsRef.current.close();
+      soundEffects.stopEmergencySiren();
+    };
+  }, [fetchIncidentsFromBackend, fetchVehiclesFromBackend, fetchRescueServicesFromBackend, checkAiHealth, isAudioAlertEnabled]);
+
+  // Operational Actions
+  const handleAcknowledge = async (incidentId: string) => {
     try {
       await fetch(`http://localhost:5000/api/incidents/${incidentId}/acknowledge`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ acknowledgedBy: 'Rescue 1122 Central Command' }),
+        body: JSON.stringify({ acknowledgedBy: 'Central Command Dispatcher' }),
       });
-      setLiveEmergency(null);
-      fetchDbIncidents();
     } catch {
-      setLiveEmergency(null);
+      // Local fallback update
     }
+
+    setLiveEmergency(null);
+    soundEffects.stopEmergencySiren();
+    soundEffects.playSafeDisarmChime();
+
+    // Update local incidents state
+    setIncidents((prev) =>
+      prev.map((i) => (i.id === incidentId ? { ...i, status: 'acknowledged' } : i))
+    );
   };
 
-  // Merge database incidents with local context for display
-  const allIncidents = dbIncidents.length > 0
-    ? dbIncidents.map((dbInc) => ({
-        id: dbInc.id,
-        dateTimeStr: new Date(dbInc.timestamp).toLocaleString('en-PK'),
-        severity: dbInc.severity,
-        coordinates: {
-          address: dbInc.address,
-          city: dbInc.city,
-          province: dbInc.province,
-        },
-        vehicle: {
-          make: dbInc.make || 'Honda',
-          model: dbInc.model || 'Civic',
-          licensePlate: dbInc.license_plate || 'ICT-LE-2022',
-        },
-        sensorSnapshot: {
-          totalGForce: parseFloat(dbInc.peak_g_force) || 3.8,
-        },
-        detectionSource: dbInc.detection_source,
-        status: dbInc.status,
-      }))
-    : localIncidents;
+  const handleCancelFalseAlarm = async (incidentId: string) => {
+    try {
+      await fetch(`http://localhost:5000/api/incidents/${incidentId}/cancel`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Dispatcher Verified: Driver Safe' }),
+      });
+    } catch {
+      // Fallback
+    }
 
-  const filteredIncidents = allIncidents.filter((inc) => {
-    const matchesSearch =
-      (inc.coordinates?.city || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (inc.vehicle?.make || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (inc.vehicle?.licensePlate || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSeverity = selectedSeverity === 'all' || inc.severity === selectedSeverity;
-    return matchesSearch && matchesSeverity;
-  });
+    setIncidents((prev) =>
+      prev.map((i) => (i.id === incidentId ? { ...i, status: 'cancelled_false_alarm' } : i))
+    );
+    setSelectedIncidentId(null);
+  };
+
+  const handleDispatchFleet = (incidentId: string, serviceName: string) => {
+    soundEffects.playSafeDisarmChime();
+    setIncidents((prev) =>
+      prev.map((i) =>
+        i.id === incidentId
+          ? {
+              ...i,
+              status: 'acknowledged',
+              dispatchedFleet: serviceName,
+            }
+          : i
+      )
+    );
+  };
+
+  const handleTriggerTestIncident = async (payload: any): Promise<boolean> => {
+    try {
+      const res = await fetch('http://localhost:5000/api/incidents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        fetchIncidentsFromBackend();
+        return true;
+      }
+    } catch {
+      // Local fallback insert
+    }
+
+    // Add locally to incidents list for immediate responsiveness
+    const newInc = {
+      id: `drill-${Date.now()}`,
+      timestamp: Date.now(),
+      dateTimeStr: 'Just Now',
+      status: 'escalating',
+      severity: payload.severity,
+      coordinates: {
+        lat: payload.latitude,
+        lng: payload.longitude,
+        address: payload.address,
+        city: payload.city,
+        province: payload.province,
+      },
+      vehicle: {
+        make: 'Honda',
+        model: 'Civic',
+        licensePlate: 'ICT-LE-2022',
+      },
+      sensorSnapshot: {
+        totalGForce: payload.peakGForce,
+        speedDeltaKmH: payload.speedDropKmH,
+      },
+      detectionSource: payload.detectionSource,
+    };
+
+    setIncidents((prev) => [newInc, ...prev]);
+    setLiveEmergency(newInc);
+    if (isAudioAlertEnabled) {
+      soundEffects.startEmergencySiren();
+      setTimeout(() => soundEffects.stopEmergencySiren(), 5000);
+    }
+    return true;
+  };
+
+  const handleRegisterVehicle = async (data: any): Promise<boolean> => {
+    try {
+      const res = await fetch('http://localhost:5000/api/vehicles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (res.ok) {
+        fetchVehiclesFromBackend();
+        return true;
+      }
+    } catch {
+      // Local fallback
+    }
+
+    setVehicles((prev) => [
+      {
+        id: `v-${Date.now()}`,
+        ...data,
+      },
+      ...prev,
+    ]);
+    return true;
+  };
+
+  // Map markers mapping
+  const mapPoints = incidents.map((inc) => ({
+    id: inc.id,
+    lat: inc.coordinates?.lat || 33.7027,
+    lng: inc.coordinates?.lng || 73.0569,
+    address: inc.coordinates?.address || 'Islamabad, Pakistan',
+    city: inc.coordinates?.city || 'Islamabad',
+    severity: inc.severity,
+    peakGForce: inc.sensorSnapshot?.totalGForce || 3.5,
+    vehicleMake: inc.vehicle?.make || 'Honda',
+    vehiclePlate: inc.vehicle?.licensePlate || 'ICT-LE-2022',
+    timestamp: inc.dateTimeStr,
+    status: inc.status,
+  }));
+
+  const activeEmergencyCount = incidents.filter(
+    (i) => i.status === 'escalating' || i.status === 'countdown'
+  ).length;
+
+  const falseAlarmCount = incidents.filter((i) => i.status === 'cancelled_false_alarm').length;
+  const selectedIncident = incidents.find((i) => i.id === selectedIncidentId);
 
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6 text-slate-100">
-      {/* Live Emergency Alert Banner if an accident occurred on mobile */}
-      {liveEmergency && (
-        <div className="p-5 rounded-2xl bg-red-950/90 border-2 border-red-500 shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-pulse">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-red-600 text-white flex items-center justify-center font-bold">
-              <AlertTriangle className="w-7 h-7" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs uppercase font-black tracking-widest text-red-300">
-                  REAL-TIME MOBILE CRASH DETECTED
-                </span>
-                <span className="text-[10px] bg-red-600 text-white font-bold px-2 py-0.5 rounded">
-                  {liveEmergency.severity || 'SEVERE'}
-                </span>
-              </div>
-              <h2 className="text-base font-black text-white mt-0.5">
-                {liveEmergency.address || 'Islamabad Expressway near Faizabad Interchange'}
-              </h2>
-              <p className="text-xs text-slate-300">
-                Peak Deceleration: <strong>{liveEmergency.peak_g_force || '3.8'}g</strong> · Vehicle: ICT-LE-2022
-              </p>
-            </div>
-          </div>
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+      {/* Top Enterprise Header */}
+      <AdminHeader
+        isWsConnected={isWsConnected}
+        isDbConnected={isDbConnected}
+        isAiConnected={isAiConnected}
+        activeEmergencyCount={activeEmergencyCount}
+        onRefreshData={fetchIncidentsFromBackend}
+        isRefreshing={isRefreshing}
+        onOpenTestModal={() => setIsTestModalOpen(true)}
+        isAudioAlertEnabled={isAudioAlertEnabled}
+        onToggleAudioAlert={() => setIsAudioAlertEnabled(!isAudioAlertEnabled)}
+      />
 
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            <button
-              onClick={() => handleAcknowledgeFromConsole(liveEmergency.id)}
-              className="flex-1 md:flex-initial py-3 px-5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/30 transition-all flex items-center justify-center gap-2"
-            >
-              <CheckCircle className="w-4 h-4" />
-              <span>Acknowledge & Dispatch 1122</span>
-            </button>
-          </div>
+      {/* Main Container */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-5">
+        {/* Operations Navigation Tab Bar */}
+        <div className="flex items-center gap-1.5 p-1 bg-slate-900 border border-slate-800 rounded-2xl overflow-x-auto shadow-inner">
+          <button
+            onClick={() => setActiveTab('dispatch')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'dispatch'
+                ? 'bg-red-600 text-white shadow-md shadow-red-600/30'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Activity className="w-4 h-4" />
+            <span>Emergency Dispatch Queue</span>
+            {activeEmergencyCount > 0 && (
+              <span className="w-2 h-2 rounded-full bg-white animate-ping"></span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('gis_map')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'gis_map'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Compass className="w-4 h-4" />
+            <span>Live GIS Radar & Map</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('heatmap')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'heatmap'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Flame className="w-4 h-4" />
+            <span>Highway Risk Heatmap</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('fleets')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'fleets'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Truck className="w-4 h-4" />
+            <span>Rescue Fleets & Helplines</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('vehicles')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'vehicles'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Car className="w-4 h-4" />
+            <span>Vehicles & Drivers</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('claims')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'claims'
+                ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Wrench className="w-4 h-4" />
+            <span>AI Damage Claims</span>
+          </button>
         </div>
+
+        {/* Tab Views */}
+        {activeTab === 'dispatch' && (
+          <EmergencyDispatchQueue
+            incidents={incidents}
+            liveEmergency={liveEmergency}
+            onAcknowledge={handleAcknowledge}
+            onInspect={(id) => setSelectedIncidentId(id)}
+            onDispatchFleet={handleDispatchFleet}
+          />
+        )}
+
+        {activeTab === 'gis_map' && (
+          <InteractiveGISMap
+            incidents={mapPoints}
+            onSelectIncident={(id) => setSelectedIncidentId(id)}
+          />
+        )}
+
+        {activeTab === 'heatmap' && (
+          <CollisionHeatmapIndex
+            totalIncidents={incidents.length}
+            falseAlarmCount={falseAlarmCount}
+            allIncidentsData={incidents}
+          />
+        )}
+
+        {activeTab === 'fleets' && (
+          <RescueFleetManager
+            services={rescueServices}
+            onDispatchUnit={(srv) => {
+              soundEffects.playSafeDisarmChime();
+            }}
+          />
+        )}
+
+        {activeTab === 'vehicles' && (
+          <VehiclesRegistryView
+            vehicles={vehicles}
+            onRegisterVehicle={handleRegisterVehicle}
+          />
+        )}
+
+        {activeTab === 'claims' && <DamageClaimsView />}
+      </main>
+
+      {/* Incident Detail Inspection Drawer */}
+      {selectedIncident && (
+        <IncidentDetailDrawer
+          incident={selectedIncident}
+          onClose={() => setSelectedIncidentId(null)}
+          onAcknowledge={handleAcknowledge}
+          onCancelFalseAlarm={handleCancelFalseAlarm}
+          onDispatchFleet={handleDispatchFleet}
+        />
       )}
 
-      {/* Top Command Banner */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-2xl bg-linear-to-r from-blue-950/40 via-slate-900 to-slate-900 border border-blue-900/40">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
-            <Shield className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-black text-white">
-                ResQDrive Central Dispatch Command Center
-              </h1>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 ${
-                isLiveConnected ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-400'
-              }`}>
-                <Radio className="w-3 h-3 animate-pulse" />
-                {isLiveConnected ? 'PostgreSQL & WebSocket Live' : 'Polling API Mode'}
-              </span>
-            </div>
-            <p className="text-xs text-slate-400">
-              National Emergency Operations Console · Air University Islamabad (AU)
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={fetchDbIncidents}
-            disabled={isRefreshing}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition-colors"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span>Sync PostgreSQL</span>
-          </button>
-
-          <button
-            onClick={() => {
-              const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(allIncidents, null, 2));
-              const dl = document.createElement('a');
-              dl.setAttribute('href', dataStr);
-              dl.setAttribute('download', 'resqdrive_incidents_export.json');
-              dl.click();
-            }}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-colors"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export Incident Dataset</span>
-          </button>
-        </div>
-      </div>
-
-      {/* KPI Stats Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800">
-          <span className="text-[10px] uppercase font-bold text-slate-400 block">Logged Collisions (PostgreSQL)</span>
-          <div className="text-2xl font-black font-mono text-white mt-1">{allIncidents.length}</div>
-          <span className="text-[10px] text-emerald-400">Database Synced</span>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800">
-          <span className="text-[10px] uppercase font-bold text-slate-400 block">False Alarms Cancelled</span>
-          <div className="text-2xl font-black font-mono text-blue-400 mt-1">
-            {allIncidents.filter((i) => i.status === 'cancelled_false_alarm').length + 84}
-          </div>
-          <span className="text-[10px] text-slate-400">Via 10s Voice / Tap Abort</span>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800">
-          <span className="text-[10px] uppercase font-bold text-slate-400 block">Rescue 1122 Dispatches</span>
-          <div className="text-2xl font-black font-mono text-red-400 mt-1">112</div>
-          <span className="text-[10px] text-red-400">Avg 6.4m Response Time</span>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800">
-          <span className="text-[10px] uppercase font-bold text-slate-400 block">PakWheels Linked Claims</span>
-          <div className="text-2xl font-black font-mono text-emerald-400 mt-1">
-            158
-          </div>
-          <span className="text-[10px] text-slate-400">AI Damage Quotes (PKR)</span>
-        </div>
-      </div>
-
-      {/* Pakistan Highway Collision Hotspots Heatmap Table */}
-      <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Flame className="w-5 h-5 text-red-400" />
-            <h2 className="text-sm font-bold text-white">Pakistan Highway Collision Hotspots & Risk Index</h2>
-          </div>
-          <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-red-500/20 text-red-400">
-            Real-Time Analysis
-          </span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-slate-800 text-slate-400 text-[11px]">
-                <th className="py-2.5 px-3 font-semibold">Corridor / Road</th>
-                <th className="py-2.5 px-3 font-semibold">City / Region</th>
-                <th className="py-2.5 px-3 font-semibold">Recorded Impacts</th>
-                <th className="py-2.5 px-3 font-semibold">Avg Collision Speed</th>
-                <th className="py-2.5 px-3 font-semibold">Risk Classification</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60 font-mono">
-              {HOTSPOT_LOCATIONS.map((spot, i) => (
-                <tr key={i} className="hover:bg-slate-800/30">
-                  <td className="py-3 px-3 font-sans font-bold text-white">{spot.name}</td>
-                  <td className="py-3 px-3 font-sans text-slate-300">{spot.city}</td>
-                  <td className="py-3 px-3 text-slate-200">{spot.crashes}</td>
-                  <td className="py-3 px-3 text-slate-300">{spot.avgSpeed}</td>
-                  <td className="py-3 px-3 font-sans">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      spot.risk === 'Severe'
-                        ? 'bg-red-950/80 text-red-300 border border-red-800'
-                        : 'bg-amber-950/80 text-amber-300 border border-amber-800'
-                    }`}>
-                      {spot.risk}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Incident Log Stream with Filter & Search */}
-      <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <h2 className="text-sm font-bold text-white">Live Collision Incident & False Alarm Audit Log (PostgreSQL)</h2>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-60">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search city, plate or make..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-blue-500"
-              />
-            </div>
-
-            <select
-              value={selectedSeverity}
-              onChange={(e) => setSelectedSeverity(e.target.value)}
-              className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-blue-500"
-            >
-              <option value="all">All Severities</option>
-              <option value="Minor">Minor</option>
-              <option value="Moderate">Moderate</option>
-              <option value="Severe">Severe</option>
-            </select>
-          </div>
-        </div>
-
-        {filteredIncidents.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-400">
-            No incident records found. When an accident triggers on your mobile phone running Expo Go, it will appear here in real time!
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {filteredIncidents.map((inc) => (
-              <div
-                key={inc.id}
-                className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs"
-              >
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-white font-mono">{inc.dateTimeStr}</span>
-                    <span className={`px-2 py-0.2 rounded font-bold text-[10px] ${
-                      inc.severity === 'Severe'
-                        ? 'bg-red-500/20 text-red-400'
-                        : inc.severity === 'Moderate'
-                        ? 'bg-amber-500/20 text-amber-400'
-                        : 'bg-emerald-500/20 text-emerald-400'
-                    }`}>
-                      {inc.severity}
-                    </span>
-                    <span className="text-slate-400">·</span>
-                    <span className="text-slate-300 font-medium">{inc.coordinates?.address}</span>
-                  </div>
-
-                  <div className="text-[11px] text-slate-400 font-mono">
-                    Vehicle: {inc.vehicle?.make} {inc.vehicle?.model} ({inc.vehicle?.licensePlate}) · G-Force: {inc.sensorSnapshot?.totalGForce}g · Source: {inc.detectionSource}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className={`px-2 py-1 rounded text-[10px] font-bold ${
-                    inc.status === 'cancelled_false_alarm'
-                      ? 'bg-blue-950/60 text-blue-300 border border-blue-800'
-                      : inc.status === 'acknowledged'
-                      ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-800'
-                      : 'bg-red-950/60 text-red-300 border border-red-800 animate-pulse'
-                  }`}>
-                    {inc.status === 'cancelled_false_alarm' ? 'Cancelled (False Alarm)' : inc.status.toUpperCase()}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Diagnostic Crash Simulation Modal */}
+      <TestCollisionTriggerModal
+        isOpen={isTestModalOpen}
+        onClose={() => setIsTestModalOpen(false)}
+        onTriggerTestIncident={handleTriggerTestIncident}
+      />
     </div>
   );
 };
